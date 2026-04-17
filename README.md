@@ -1,9 +1,19 @@
 # Gabbee
 
-Gabbee is a fresh voice-input project for modern Linux desktops.
+Gabbee is a floating push-to-talk dictation bar for Linux desktops.
 
-The design target is KDE Plasma on Wayland, but the important constraint is broader:
-Gabbee should commit text through an input method engine, not by grabbing keyboards or replaying key events.
+It is designed for real text entry workflows on terminals, editors, chat apps, browsers, and other foreground windows. On this machine, the delivery path prefers active-window typing first, then IBus when available, and mirrors successful dictation to the clipboard so text is still recoverable if the foreground app does not accept direct input.
+
+The main target is KDE Plasma on Wayland, but the project is intentionally pragmatic: it should help you speak text into the app you are actually using instead of behaving like a fragile keyboard macro toy.
+
+## Highlights
+
+- Floating voice bar with global push-to-talk.
+- Active-window typing fallback for terminals and editors.
+- IBus integration for IME-style text commit when available.
+- Clipboard mirroring for recovery and paste-based workflows.
+- ElevenLabs STT and local Whisper support.
+- PipeWire recording on modern Linux desktops.
 
 ## Principles
 
@@ -14,15 +24,16 @@ Gabbee should commit text through an input method engine, not by grabbing keyboa
 - Floating control bar instead of shortcut-only control.
 - Provider secrets stay in `.env`, outside the codebase.
 
-## Current MVP
+## Current status
 
 - Floating Qt bar with `Start`, `Stop`, and `Cancel`.
 - PipeWire recording via `pw-record`.
 - STT provider abstraction.
 - ElevenLabs STT provider using `ELEVENLABS_API_KEY` from `.env`.
-- IBus engine skeleton with a local commit bridge.
+- IBus engine with a local commit bridge.
 - `gabbee-install-ibus` helper for writing the user-local IBus component.
-- Clipboard fallback if no active Gabbee IBus context is available.
+- Active-window typing fallback for terminals and editors.
+- Clipboard mirroring for recovery and paste-based workflows.
 
 ## Environment
 
@@ -78,7 +89,7 @@ Gabbee is split into three layers:
 3. `gabbee.stt`
    Provider adapters for transcription.
 
-The bar records audio, asks the configured STT backend for text, and then sends the result to the active IBus engine over a local Unix socket. If no Gabbee IBus engine is active, the MVP falls back to copying the text to the clipboard instead of emitting fake keypresses.
+The bar records audio, asks the configured STT backend for text, and then tries to deliver the transcript in a practical order: active-window typing first, IBus when it is the better path, and clipboard mirroring as a safety net.
 
 ## Local install
 
@@ -190,11 +201,11 @@ gabbee-bar
 Usage:
 
 1. Focus a text field.
-2. Switch your current input method to `Gabbee Voice Input`.
+2. If you want explicit IBus commit behavior, switch your current input method to `Gabbee Voice Input`.
 3. Click `Start`.
 4. Speak.
 5. Click `Stop`.
-6. Gabbee will transcribe and either commit through IBus or fall back to the clipboard if Gabbee is not the active IBus engine for that field.
+6. Gabbee will transcribe and try to type into the active window, use IBus when available, and mirror successful output to the clipboard.
 
 On KDE Plasma Wayland, the first run may show a desktop portal prompt to approve the global `F5` push-to-talk shortcut. If you do not approve it, `F5` still works while the Gabbee window is focused.
 
@@ -225,7 +236,10 @@ The point of the IBus boundary is to make voice input behave like text input, no
 
 ## Next steps
 
-- Turn the IBus skeleton into a fully installable input method component.
 - Add persistent settings UI.
 - Add preedit and streaming partial transcript support.
 - Add a guided first-run setup flow for IBus and desktop integration.
+
+## License
+
+Gabbee is licensed under the GNU General Public License v3.0. See `LICENSE`.
