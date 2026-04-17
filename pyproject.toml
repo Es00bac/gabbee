@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gabbee"
+version = "0.1.0"
+description = "IME-first English voice input for KDE Plasma Wayland"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "PyQt6>=6.6",
+  "python-dotenv>=1.0",
+  "requests>=2.31",
+]
+
+[project.optional-dependencies]
+whisper_local = [
+  "faster-whisper>=1.0.3",
+]
+
+[project.scripts]
+gabbee-bar = "gabbee.main_bar:main"
+gabbee-engine = "gabbee.main_engine:main"
+gabbee-commit = "gabbee.ibus_client:main"
+gabbee-install-ibus = "gabbee.install:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component type="inputmethod">
+  <name>org.freedesktop.IBus.Gabbee</name>
+  <description>Gabbee voice input component</description>
+  <exec>gabbee-engine --ibus</exec>
+  <version>0.1.0</version>
+  <author>cabewse</author>
+  <license>MIT</license>
+  <homepage>https://local.gabbee</homepage>
+  <textdomain>gabbee</textdomain>
+  <engines>
+    <engine>
+      <name>gabbee</name>
+      <language>en</language>
+      <license>MIT</license>
+      <author>cabewse</author>
+      <icon>gabbee</icon>
+      <layout>default</layout>
+      <symbol>GB</symbol>
+      <longname>Gabbee Voice Input</longname>
+      <description>English voice input through IBus</description>
+      <rank>0</rank>
+    </engine>
+  </engines>
+</component>
