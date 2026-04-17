@@ -1,10 +1,19 @@
 # Gabbee
 
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-Linux-1f6feb)
+![Python](https://img.shields.io/badge/python-3.11%2B-3776ab)
+![Status](https://img.shields.io/badge/status-experimental-c97b18)
+
 Gabbee is a floating push-to-talk dictation bar for Linux desktops.
 
 It is designed for real text entry workflows on terminals, editors, chat apps, browsers, and other foreground windows. On this machine, the delivery path prefers active-window typing first, then IBus when available, and mirrors successful dictation to the clipboard so text is still recoverable if the foreground app does not accept direct input.
 
 The main target is KDE Plasma on Wayland, but the project is intentionally pragmatic: it should help you speak text into the app you are actually using instead of behaving like a fragile keyboard macro toy.
+
+## Screenshot
+
+![Gabbee floating dictation bar](docs/gabbee-bar.png)
 
 ## Highlights
 
@@ -239,6 +248,15 @@ The point of the IBus boundary is to make voice input behave like text input, no
 - Add persistent settings UI.
 - Add preedit and streaming partial transcript support.
 - Add a guided first-run setup flow for IBus and desktop integration.
+
+## Release checklist
+
+- Run `python -m unittest discover -s tests` inside the project venv.
+- Launch `gabbee-bar` and verify recording, transcription, and delivery still work on the target desktop.
+- Confirm `gabbee-install-ibus --setup` still installs the component, launcher, and icon cleanly.
+- Verify no local `.env`, API keys, or machine-specific secrets are staged.
+- Refresh `docs/gabbee-bar.png` if the bar layout or visual style changed.
+- Re-read the install section and environment keys in this README after any setup or config changes.
 
 ## License
 
