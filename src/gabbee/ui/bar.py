@@ -24,6 +24,8 @@ class _SnapshotBus(QWidget):
 
 
 class FloatingBar(QWidget):
+    settings_requested = pyqtSignal()
+
     def __init__(
         self,
         app: QApplication,
@@ -69,6 +71,17 @@ class FloatingBar(QWidget):
         header.setSpacing(6)
         outer.addLayout(header)
 
+        self.drag_handle = QFrame()
+        self.drag_handle.setObjectName("dragHandle")
+        self.drag_handle.setFixedSize(12, 24)
+        self.drag_handle.setCursor(Qt.CursorShape.SizeAllCursor)
+        header.addWidget(self.drag_handle)
+        
+        # Make the drag handle work specifically
+        self.drag_handle.mousePressEvent = self.mousePressEvent
+        self.drag_handle.mouseMoveEvent = self.mouseMoveEvent
+        self.drag_handle.mouseReleaseEvent = self.mouseReleaseEvent
+
         title_label = QLabel(self.title)
         title_font = QFont()
         title_font.setPointSize(11)
@@ -99,6 +112,13 @@ class FloatingBar(QWidget):
         self.start_button.clicked.connect(self.controller.start)
         self.stop_button.clicked.connect(self.controller.stop)
         self.cancel_button.clicked.connect(self.controller.cancel)
+
+        self.settings_button = QPushButton("⚙")
+        self.settings_button.setObjectName("settingsButton")
+        self.settings_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.settings_button.setFixedSize(24, 24)
+        self.settings_button.clicked.connect(self.settings_requested.emit)
+        header.addWidget(self.settings_button)
 
         self.provider_label = QLabel("Provider: unknown")
         self.provider_label.setObjectName("subtle")
@@ -134,6 +154,14 @@ class FloatingBar(QWidget):
                 border: 1px solid rgba(98, 161, 150, 120);
                 border-radius: 10px;
             }
+            QFrame#dragHandle {
+                background: rgba(255, 255, 255, 30);
+                border-radius: 3px;
+                border: 1px solid rgba(255, 255, 255, 50);
+            }
+            QFrame#dragHandle:hover {
+                background: rgba(255, 255, 255, 60);
+            }
             QLabel#statusChip {
                 background: rgba(44, 113, 102, 190);
                 border-radius: 8px;
@@ -164,6 +192,15 @@ class FloatingBar(QWidget):
             }
             QPushButton:hover:!disabled {
                 background: #24988a;
+            }
+            QPushButton#settingsButton {
+                background: rgba(255, 255, 255, 15);
+                font-size: 14px;
+                padding: 0;
+                min-width: 24px;
+            }
+            QPushButton#settingsButton:hover {
+                background: rgba(255, 255, 255, 30);
             }
             """
         )

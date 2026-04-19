@@ -14,6 +14,9 @@ class TextSink(Protocol):
     def deliver(self, text: str) -> DeliveryResult:
         ...
 
+    def deliver_key(self, key_stroke: str) -> DeliveryResult:
+        ...
+
 
 class IBusTextSink:
     def __init__(self, socket_path: Path | None = None) -> None:
@@ -23,6 +26,10 @@ class IBusTextSink:
         reply = self.client.commit_text(text)
         return DeliveryResult(ok=reply.ok, method="ibus", detail=reply.detail)
 
+    def deliver_key(self, key_stroke: str) -> DeliveryResult:
+        # IBus bridge doesn't support keys yet, fallback or ignore
+        return DeliveryResult(ok=False, method="ibus", detail="Key delivery not supported by IBus bridge.")
+
 
 class ActiveWindowTextSink:
     def deliver(self, text: str) -> DeliveryResult:
@@ -31,6 +38,15 @@ class ActiveWindowTextSink:
         if shutil.which("xdotool"):
             return self._deliver_with_xdotool(text)
         return DeliveryResult(ok=False, method="type", detail="No active-window typing tool is available.")
+
+    def deliver_key(self, key_stroke: str) -> DeliveryResult:
+        if shutil.which("dotool"):
+            subprocess.run(["dotool"], input=f"key {key_stroke}\n".encode("utf-8"), check=True)
+            return DeliveryResult(ok=True, method="key", detail=f"Sent key {key_stroke} with dotool.")
+        if shutil.which("xdotool"):
+            subprocess.run(["xdotool", "key", key_stroke], check=True)
+            return DeliveryResult(ok=True, method="key", detail=f"Sent key {key_stroke} with xdotool.")
+        return DeliveryResult(ok=False, method="key", detail="No active-window typing tool is available.")
 
     def _deliver_with_dotool(self, text: str) -> DeliveryResult:
         actions = ["typedelay 1"]
@@ -66,6 +82,9 @@ class ClipboardTextSink:
             return DeliveryResult(ok=True, method="clipboard", detail="Copied with xclip.")
         return DeliveryResult(ok=False, method="clipboard", detail="No clipboard command is available.")
 
+    def deliver_key(self, key_stroke: str) -> DeliveryResult:
+        return DeliveryResult(ok=False, method="clipboard", detail="Clipboard sink does not support key delivery.")
+
 
 class FallbackTextSink:
     def __init__(self, primary: TextSink, fallback: TextSink) -> None:
@@ -77,6 +96,15 @@ class FallbackTextSink:
         if primary_result.ok:
             return primary_result
         fallback_result = self.fallback.deliver(text)
+        if fallback_result.ok:
+            fallback_result.detail = f"{primary_result.detail} Fallback: {fallback_result.detail}".strip()
+        return fallback_result
+
+    def deliver_key(self, key_stroke: str) -> DeliveryResult:
+        primary_result = self.primary.deliver_key(key_stroke)
+        if primary_result.ok:
+            return primary_result
+        fallback_result = self.fallback.deliver_key(key_stroke)
         if fallback_result.ok:
             fallback_result.detail = f"{primary_result.detail} Fallback: {fallback_result.detail}".strip()
         return fallback_result
@@ -102,3 +130,6 @@ class MirroringTextSink:
             method=f"{primary_result.method}+{mirror_result.method}",
             detail=f"{primary_result.detail} Mirrored: {mirror_result.detail}".strip(),
         )
+
+    def deliver_key(self, key_stroke: str) -> DeliveryResult:
+        return self.primary.deliver_key(key_stroke)

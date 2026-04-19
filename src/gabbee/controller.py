@@ -11,6 +11,7 @@ from .output import ActiveWindowTextSink, ClipboardTextSink, FallbackTextSink, I
 from .stt.elevenlabs import ElevenLabsSpeechToText
 from .stt.mock import MockSpeechToText
 from .stt.whisper_local import WhisperLocalSpeechToText
+from .text_processor import TextProcessor
 
 
 class RecorderProtocol(Protocol):
@@ -66,6 +67,7 @@ class GabbeeController:
         self.recorder = recorder or PipeWireRecorder(sample_rate=config.sample_rate)
         self.transcriber = transcriber or build_transcriber(config)
         self.sink = sink or build_sink(config)
+        self.processor = TextProcessor(config.keyword_map)
         self.state = ControllerState.IDLE
         self.last_text = ""
         self.error_message = ""
@@ -136,11 +138,23 @@ class GabbeeController:
     def _transcribe_and_deliver(self, audio_path: Path) -> None:
         try:
             result = self.transcriber.transcribe(audio_path)
-            self.last_text = result.text
+            actions = self.processor.process_to_actions(result.text)
+            self.last_text = result.text # Show original or processed? User might want to see what happened.
+            # Let's show a summary of what's being delivered
+            display_text = " ".join([v if t == 'text' else f"[{v}]" for t, v in actions])
+            self.last_text = display_text
+            
             self._set_state(ControllerState.DELIVERING)
-            delivery = self.sink.deliver(result.text)
-            if not delivery.ok:
-                raise RuntimeError(delivery.detail)
+            for action_type, action_value in actions:
+                if action_type == "text":
+                    delivery = self.sink.deliver(action_value)
+                else:
+                    delivery = self.sink.deliver_key(action_value)
+                
+                if not delivery.ok:
+                    # Log error but maybe continue?
+                    print(f"Delivery failed: {delivery.detail}")
+            
             self._set_state(ControllerState.IDLE)
         except Exception as exc:
             self._set_state(ControllerState.ERROR, error=str(exc))

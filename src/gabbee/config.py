@@ -26,9 +26,63 @@ class AppConfig:
     whisper_local_model: str = "tiny"
     whisper_local_device: str = "cpu"
     whisper_local_compute_type: str = "default"
+    keyword_map: dict[str, str] = field(default_factory=dict)
 
     def env(self, name: str, default: str | None = None) -> str | None:
         return self.env_values.get(name, default)
+
+    def save(self, updates: dict[str, str] | None = None) -> None:
+        if updates:
+            self.env_values.update(updates)
+            # Update attributes as well
+            if "GABBEE_STT_PROVIDER" in updates:
+                self.stt_provider = updates["GABBEE_STT_PROVIDER"]
+            if "GABBEE_TOGGLE_SHORTCUT" in updates:
+                self.toggle_shortcut = updates["GABBEE_TOGGLE_SHORTCUT"]
+            if "GABBEE_WHISPER_LOCAL_MODEL" in updates:
+                self.whisper_local_model = updates["GABBEE_WHISPER_LOCAL_MODEL"]
+            if "GABBEE_WHISPER_LOCAL_DEVICE" in updates:
+                self.whisper_local_device = updates["GABBEE_WHISPER_LOCAL_DEVICE"]
+            if "GABBEE_SAMPLE_RATE" in updates:
+                self.sample_rate = int(updates["GABBEE_SAMPLE_RATE"])
+
+        content = []
+        # Filter out system env vars, only save what we manage
+        keys_to_save = [
+            "ELEVENLABS_API_KEY",
+            "GABBEE_STT_PROVIDER",
+            "GABBEE_LANGUAGE_CODE",
+            "GABBEE_ELEVENLABS_MODEL_ID",
+            "GABBEE_ELEVENLABS_BASE_URL",
+            "GABBEE_AUDIO_SOURCE",
+            "GABBEE_SAMPLE_RATE",
+            "GABBEE_FALLBACK_SINK",
+            "GABBEE_UI_TITLE",
+            "GABBEE_TOGGLE_SHORTCUT",
+            "GABBEE_WHISPER_LOCAL_MODEL",
+            "GABBEE_WHISPER_LOCAL_DEVICE",
+            "GABBEE_WHISPER_LOCAL_COMPUTE_TYPE",
+            "GABBEE_KEYWORDS",
+        ]
+        for key in keys_to_save:
+            value = self.env_values.get(key)
+            if value is not None:
+                content.append(f"{key}={value}")
+        
+        # Add keywords if they exist and aren't in env_values as string already
+        if self.keyword_map and "GABBEE_KEYWORDS" not in updates:
+            kw_str = ",".join([f"{k}:{v}" for k, v in self.keyword_map.items()])
+            # Check if GABBEE_KEYWORDS is already in content, if so replace it
+            found = False
+            for i, line in enumerate(content):
+                if line.startswith("GABBEE_KEYWORDS="):
+                    content[i] = f"GABBEE_KEYWORDS={kw_str}"
+                    found = True
+                    break
+            if not found:
+                content.append(f"GABBEE_KEYWORDS={kw_str}")
+
+        self.env_file.write_text("\n".join(content) + "\n")
 
     def elevenlabs_api_key(self) -> str | None:
         return self.env("ELEVENLABS_API_KEY")
@@ -84,6 +138,14 @@ def load_config(paths: AppPaths | None = None) -> AppConfig:
 
     default_provider = "elevenlabs" if _env_lookup(merged_env, "ELEVENLABS_API_KEY") else "mock"
 
+    kw_raw = _get_str(merged_env, "GABBEE_KEYWORDS", "")
+    keyword_map = {}
+    if kw_raw:
+        for pair in kw_raw.split(","):
+            if ":" in pair:
+                k, v = pair.split(":", 1)
+                keyword_map[k.strip()] = v.strip()
+
     return AppConfig(
         paths=paths,
         env_file=env_file,
@@ -100,4 +162,5 @@ def load_config(paths: AppPaths | None = None) -> AppConfig:
         whisper_local_model=_get_str(merged_env, "GABBEE_WHISPER_LOCAL_MODEL", "tiny"),
         whisper_local_device=_get_str(merged_env, "GABBEE_WHISPER_LOCAL_DEVICE", "cpu"),
         whisper_local_compute_type=_get_str(merged_env, "GABBEE_WHISPER_LOCAL_COMPUTE_TYPE", "default"),
+        keyword_map=keyword_map,
     )
