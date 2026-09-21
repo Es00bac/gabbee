@@ -21,7 +21,7 @@ EGIT_REPO_URI="file:///home/cabewse/git/gabbee.git
 	file:///home/cabewse/work_space/gabbee"
 # AGENT-NOTE: an immutable pin, not a branch — a package built twice must be
 # the same package. Bump it together with the version.
-EGIT_COMMIT="6a64da06962cd916366088af43af783ff93d7496"
+EGIT_COMMIT="5cbc0b4a07effa9689bbf032da5f1125bc8d4c26"
 
 LICENSE="GPL-3+"
 SLOT="0"
