@@ -398,9 +398,10 @@ class QindaQtVoiceService(QObject):
             if self._capturing():
                 return "already-capturing"
             # Persisted, then reloaded, so the choice survives a restart and
-            # the next dictation actually uses it.
+            # the next dictation actually uses it. AppConfig.save() is what
+            # updates stt_provider; setting it here too would be a second
+            # place to keep in step with that method.
             self.config.save({"GABBEE_STT_PROVIDER": candidate})
-            self.config.stt_provider = candidate
             self.controller.reload_transcriber()
             return None
 

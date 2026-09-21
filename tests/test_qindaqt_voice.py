@@ -48,7 +48,10 @@ class FakeConfig:
             setattr(self, key, value)
 
     def save(self, updates):
+        # Mirrors AppConfig.save(): it writes the attribute, not the caller.
         self.saved.update(updates)
+        if "GABBEE_STT_PROVIDER" in updates:
+            self.stt_provider = updates["GABBEE_STT_PROVIDER"]
 
 
 class FakeRecorder:
@@ -306,7 +309,11 @@ def test_set_provider_persists_and_reloads(service):
     result = service.SetProvider(9, revision, "whisper_local")
     assert result["status"] == STATUS_SUCCEEDED
     assert service.config.saved == {"GABBEE_STT_PROVIDER": "whisper_local"}
+    assert service.config.stt_provider == "whisper_local"
     assert service.controller.reload_count == 1
+    # The next snapshot reports the provider the user actually chose.
+    service._apply_snapshot(service.controller.snapshot())
+    assert service.GetSnapshot()["providerId"] == "whisper_local"
 
 
 def test_set_provider_refuses_an_unknown_identifier(service):
