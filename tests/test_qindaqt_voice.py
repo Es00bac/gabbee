@@ -326,11 +326,33 @@ def test_set_enabled_disarms_and_cancels_a_live_recording(service):
 
 
 def test_level_reports_are_rate_limited_and_clamped(service):
-    emitted = []
-    service.Level.connect(emitted.append)
+    # _on_level runs on the PCM reader thread and hands the value to the relay;
+    # the relay is what reaches the exported D-Bus signal.
+    relayed = []
+    service._relay.levelled.connect(relayed.append)
     service._on_level(250)
     service._on_level(10)
-    assert emitted == [100]
+    assert relayed == [100]
     service._last_level_emit = 0.0
     service._on_level(-5)
-    assert emitted == [100, 0]
+    assert relayed == [100, 0]
+
+
+def test_level_reaches_the_exported_signal_through_the_relay(service):
+    emitted = []
+    service.Level.connect(emitted.append)
+    service._publish_level(42)
+    assert emitted == [42]
+
+
+def test_the_exported_class_declares_only_the_two_contract_signals(service):
+    # AGENT-GUARD: anything else on this class is offered on the bus. A
+    # pyqtSignal(object) here is rejected by Qt as an unregistered type and
+    # logged on every registration.
+    meta = type(service).staticMetaObject
+    signals = {
+        bytes(meta.method(i).methodSignature()).decode().split("(")[0]
+        for i in range(meta.methodOffset(), meta.methodCount())
+        if meta.method(i).methodType() == meta.method(i).methodType().Signal
+    }
+    assert signals == {"Changed", "Level"}

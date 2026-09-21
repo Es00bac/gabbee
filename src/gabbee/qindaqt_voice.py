@@ -72,16 +72,22 @@ from .qindaqt_voice_wire import (
 )
 
 class _SnapshotRelay(QObject):
-    """Main-thread hop for controller notifications.
+    """Main-thread hop for everything the controller reports.
 
     AGENT-GUARD: this deliberately lives outside QindaQtVoiceService. That
     object is registered with ExportAllSlots|ExportAllSignals, so a
     ``pyqtSignal(object)`` declared on it is offered on the bus, rejected as an
     unregistered ``PyQt_PyObject``, and logged on every registration. Only the
     two contract signals may live on the exported class.
+
+    AGENT-GUARD: both hops matter. Controller snapshots arrive on worker
+    threads and capture levels arrive on the PCM reader thread; emitting a
+    D-Bus-exported signal from either would put the session bus in the capture
+    path on a thread Qt did not set it up on.
     """
 
     arrived = pyqtSignal(object)
+    levelled = pyqtSignal(int)
 
 
 @pyqtClassInfo("D-Bus Interface", INTERFACE_NAME)
@@ -113,6 +119,7 @@ class QindaQtVoiceService(QObject):
         self._level_interval = 0.08
         self._relay = _SnapshotRelay()
         self._relay.arrived.connect(self._apply_snapshot)
+        self._relay.levelled.connect(self._publish_level)
         self._payload = self._compose(controller.snapshot())
 
     # -- lifecycle ---------------------------------------------------------
@@ -164,13 +171,21 @@ class QindaQtVoiceService(QObject):
         self.Changed.emit(self._revision)
 
     def _on_level(self, percent: int) -> None:
-        # Lossy by design: dropping a frame costs nothing, and a signal per
-        # PCM chunk would put the session bus in the capture path.
+        """Called on the PCM reader thread for every captured chunk.
+
+        Lossy by design: dropping a frame costs nothing, and a signal per chunk
+        would put the session bus in the capture path. The rate limit is
+        applied here so the discarded frames never cross a thread at all.
+        """
+
         now = time.monotonic()
         if now - self._last_level_emit < self._level_interval:
             return
         self._last_level_emit = now
-        self.Level.emit(max(0, min(100, int(percent))))
+        self._relay.levelled.emit(max(0, min(100, int(percent))))
+
+    def _publish_level(self, percent: int) -> None:
+        self.Level.emit(percent)
 
     def _capabilities(self) -> int:
         capabilities = (
