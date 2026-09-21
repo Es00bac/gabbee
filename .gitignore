@@ -4,6 +4,29 @@ __pycache__/
 .coverage
 .codex
 .venv/
+.venv-*/
 dist/
 build/
 *.egg-info/
+
+# Packaging output, not packaging recipes.
+pkg/
+*.pkg.tar.zst
+
+# Runtime logs written next to the checkout by the bar, the engine and the
+# D-Bus service. They contain timings and categories, never audio or
+# transcripts, but they are still per-machine state.
+*.log
+
+# Agent session state. The design specs under docs/ are tracked; the tool's
+# own replay logs, checkpoints and brainstorm servers are not.
+.omc/
+.superpowers/
+
+# A stale in-tree build once copied these next to the package directory.
+# The real ones are at the repository root.
+src/LICENSE
+src/README.md
+src/pyproject.toml
+src/.omc/
+src/plasmoid/

@@ -13,10 +13,16 @@ class GabbeeTrayIcon(QSystemTrayIcon):
         
         self.show_bar_action = QAction("Show Bar", self)
         self.menu.addAction(self.show_bar_action)
-        
+
+        self.hide_bar_action = QAction("Hide Bar", self)
+        self.menu.addAction(self.hide_bar_action)
+
         self.config_action = QAction("Configuration...", self)
         self.menu.addAction(self.config_action)
-        
+
+        self.command_studio_action = QAction("Command Studio...", self)
+        self.menu.addAction(self.command_studio_action)
+
         self.menu.addSeparator()
         
         self.quit_action = QAction("Quit", self)

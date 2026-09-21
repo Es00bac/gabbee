@@ -6,11 +6,38 @@ import json
 import socketserver
 import threading
 
-import gi
+try:
+    import gi
 
-gi.require_version("IBus", "1.0")
+    gi.require_version("IBus", "1.0")
+    from gi.repository import GLib, GObject, IBus
 
-from gi.repository import GLib, GObject, IBus
+    IBUS_AVAILABLE = True
+except (ImportError, ValueError):
+    # Core tests and non-IBus installations can still exercise focus tracking
+    # and socket semantics. main_engine performs the mandatory packaged-runtime
+    # check before starting an actual engine.
+    IBUS_AVAILABLE = False
+
+    class _StubGLib:
+        @staticmethod
+        def idle_add(callback, *args):
+            return callback(*args)
+
+    class _StubEngine:
+        pass
+
+    class _StubFactory:
+        pass
+
+    class _StubIBus:
+        Engine = _StubEngine
+        Factory = _StubFactory
+        PATH_FACTORY = "/org/freedesktop/IBus/Factory"
+
+    GLib = _StubGLib()
+    GObject = object()
+    IBus = _StubIBus()
 
 from .ibus_component import COMPONENT_NAME, ENGINE_LONGNAME, ENGINE_NAME, ENGINE_OBJECT_PATH
 
@@ -42,6 +69,22 @@ class ActiveEngineRegistry:
         GLib.idle_add(engine.commit_plain_text, text)
         return True
 
+    def update_preedit(self, text: str) -> bool:
+        with self._lock:
+            engine = self._engine
+        if engine is None:
+            return False
+        GLib.idle_add(engine.update_plain_preedit, text)
+        return True
+
+    def clear_preedit(self) -> bool:
+        with self._lock:
+            engine = self._engine
+        if engine is None:
+            return False
+        GLib.idle_add(engine.clear_plain_preedit)
+        return True
+
 
 class GabbeeEngine(IBus.Engine):
     __gtype_name__ = "GabbeeEngine"
@@ -58,6 +101,14 @@ class GabbeeEngine(IBus.Engine):
 
     def commit_plain_text(self, text: str) -> bool:
         self.commit_text(IBus.Text.new_from_string(text))
+        return False
+
+    def update_plain_preedit(self, text: str) -> bool:
+        self.update_preedit_text(IBus.Text.new_from_string(text), len(text), bool(text))
+        return False
+
+    def clear_plain_preedit(self) -> bool:
+        self.hide_preedit_text()
         return False
 
     def do_enable(self) -> None:
@@ -97,6 +148,8 @@ class GabbeeEngineFactory(IBus.Factory):
 
 
 def build_component(executable: str) -> IBus.Component:
+    if not IBUS_AVAILABLE:
+        raise RuntimeError("IBus introspection bindings are unavailable.")
     component = IBus.Component(
         name=COMPONENT_NAME,
         description="Gabbee voice input component",
@@ -152,13 +205,19 @@ class SocketBridge:
         if action == "ping":
             return {"ok": True, "detail": "pong"}
         if action == "commit_text":
-            text = str(body.get("text", "")).strip()
+            text = str(body.get("text", ""))
             if not text:
                 return {"ok": False, "detail": "No text to commit."}
             if not self.registry.has_active_engine():
                 return {"ok": False, "detail": "No active Gabbee IBus engine is focused."}
             committed = self.registry.commit_text(text)
             return {"ok": committed, "detail": "Committed through IBus." if committed else "Commit failed."}
+        if action == "update_preedit":
+            updated = self.registry.update_preedit(str(body.get("text", "")))
+            return {"ok": updated, "detail": "Updated IBus preedit." if updated else "No active Gabbee IBus engine is focused."}
+        if action == "clear_preedit":
+            cleared = self.registry.clear_preedit()
+            return {"ok": cleared, "detail": "Cleared IBus preedit." if cleared else "No active Gabbee IBus engine is focused."}
         return {"ok": False, "detail": f"Unknown action: {action}"}
 
 

@@ -1,263 +1,151 @@
 # Gabbee
 
-[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-Linux-1f6feb)
-![Python](https://img.shields.io/badge/python-3.11%2B-3776ab)
-![Status](https://img.shields.io/badge/status-experimental-c97b18)
+Gabbee is an ElevenLabs-first push-to-talk dictation and deterministic desktop-control bar for Linux Wayland desktops. KDE Plasma 6 and LXQt/Labwc have first-class shortcut paths. Normal dictation can only produce text. A separate command shortcut can run saved, schema-validated desktop actions.
 
-Gabbee is a floating push-to-talk dictation bar for Linux desktops.
+The project is experimental, but its core paths are implemented and covered by automated tests.
 
-It is designed for real text entry workflows on terminals, editors, chat apps, browsers, and other foreground windows. On this machine, the delivery path prefers active-window typing first, then IBus when available, and mirrors successful dictation to the clipboard so text is still recoverable if the foreground app does not accept direct input.
+## What works
 
-The main target is KDE Plasma on Wayland, but the project is intentionally pragmatic: it should help you speak text into the app you are actually using instead of behaving like a fragile keyboard macro toy.
+- ElevenLabs `scribe_v2_realtime` over WebSocket with manual commit on key release.
+- Live partial text in the bar and IBus preedit; partials are never typed as final text.
+- Simultaneous mono 16 kHz PCM streaming and a temporary recovery WAV.
+- Automatic Scribe v2 batch fallback after connection, stream, commit, authentication, quota, or protocol failure.
+- Exactly one final delivery, with failed audio retained for Retry and successful audio removed.
+- Semantic formatting for prose-smart numbers, phones, ZIP/PIN/OTP values, versions, IPs, ports, dates, times, money, percentages, measurements, identifiers, fractions, ordinals, signs, decimals, and magnitudes.
+- Spoken punctuation, paragraphs, quotes, parentheses, dashes, slashes, and `literal …` escaping.
+- Focus-captured delivery in this order: verified IBus commit, AT-SPI `EditableText`, clipboard paste with restoration, then `dotool`.
+- Last Dictation actions: Undo, Edit & Replace, Retry, Copy Raw, and Copy Formatted, with an option to save explicit corrections.
+- Schema-v3 command patterns with typed slots: `text`, `integer`, `digits`, `grouped_digits`, `phone`, `choice`, `app`, `window`, and `ui_target`.
+- Desktop-only macros for text, keys, waits, app/window activation, installed desktop entries, accessible actions, pointer actions, scrolling, bounded repeats, and target-exists branches.
+- Automatic app profiles by desktop-file ID and optional title regex, plus a persistent manual override.
+- KWin window discovery/activation on Plasma through short-lived generated scripts and a private D-Bus callback. On other compositors, IBus delivery and AT-SPI control remain available while compositor-level window switching is disabled.
+- AT-SPI target discovery and action invocation, non-focus-stealing numbered overlays, and a recursive screen-grid fallback.
+- Provider-specific settings, first-run setup, Secret Service/KDE Wallet credentials, redacted diagnostics, and distinct dictation/command feedback.
 
-## Screenshot
+There is no shell/process/eval action and no free-form spoken program execution. Launch actions resolve only installed `.desktop` entries. Screenshot/vision targeting is intentionally deferred behind a future resolver adapter.
 
-![Gabbee floating dictation bar](docs/gabbee-bar.png)
+## Shortcuts and safety model
 
-## Highlights
+- Dictation shortcut: `F5` by default. Its transcript is always treated as text, including words such as “delete,” “click,” or “undo.”
+- Command shortcut: `F6` by default. Only built-in deterministic commands and enabled saved patterns can act on the desktop.
+- Pressing the command shortcut again while a macro runs cancels its remaining steps. The bar also exposes Cancel Macro.
+- Ambiguous accessible controls or app windows are numbered instead of guessed.
 
-- Floating voice bar with global push-to-talk.
-- Active-window typing fallback for terminals and editors.
-- IBus integration for IME-style text commit when available.
-- Clipboard mirroring for recovery and paste-based workflows.
-- ElevenLabs STT and local Whisper support.
-- PipeWire recording on modern Linux desktops.
+Examples:
 
-## Principles
+```text
+I have two dogs and twelve cats
+→ I have two dogs and 12 cats
 
-- English-first UI and docs.
-- IME-first text delivery through IBus.
-- No raw `/dev/input` grabs.
-- No synthetic keypress loop as the primary path.
-- Floating control bar instead of shortcut-only control.
-- Provider secrets stay in `.env`, outside the codebase.
+phone number three oh three five five five one two one two
+→ (303) 555-1212
 
-## Current status
+write as digits one two three
+→ 123
 
-- Floating Qt bar with `Start`, `Stop`, and `Cancel`.
-- PipeWire recording via `pw-record`.
-- STT provider abstraction.
-- ElevenLabs STT provider using `ELEVENLABS_API_KEY` from `.env`.
-- IBus engine with a local commit bridge.
-- `gabbee-install-ibus` helper for writing the user-local IBus component.
-- Active-window typing fallback for terminals and editors.
-- Clipboard mirroring for recovery and paste-based workflows.
-
-## Environment
-
-By default Gabbee reads:
-
-`~/.opencasenv/.env`
-
-On this machine that resolves to:
-
-`/home/cabewse/.opencasenv/.env`
-
-Supported keys today:
-
-- `ELEVENLABS_API_KEY`
-- `GABBEE_STT_PROVIDER`
-- `GABBEE_LANGUAGE_CODE`
-- `GABBEE_ELEVENLABS_MODEL_ID`
-- `GABBEE_ELEVENLABS_BASE_URL`
-- `GABBEE_AUDIO_SOURCE`
-- `GABBEE_ENV_FILE`
-- `GABBEE_TOGGLE_SHORTCUT`
-- `GABBEE_WHISPER_LOCAL_MODEL`
-- `GABBEE_WHISPER_LOCAL_DEVICE`
-- `GABBEE_WHISPER_LOCAL_COMPUTE_TYPE`
-
-To use local Whisper transcription, first install the optional dependency group:
-
-```bash
-python3 -m pip install --user -e .[whisper_local]
+version one point two point three
+→ version 1.2.3
 ```
 
-Then set:
+Desktop commands include “switch to Firefox,” “next Firefox window,” “previous app,” “open Kate,” “click Save,” “focus Search,” “scroll down three,” and “show numbers.”
+
+## Metered ElevenLabs options
+
+Realtime dictation and batch recovery use the configured ElevenLabs account. Two optional profile features are off by default:
+
+- Keyterm prompting sends at most the 50 highest-priority enabled profile terms. ElevenLabs currently documents a 20% realtime transcription premium for keyterms.
+- Entity detection sends only selected hints. Gabbee maps friendly names such as `zip`, `id`, and `ip` to ElevenLabs labels such as `location_zip`, `generic_id`, and `ip_address`.
+
+See the official [Realtime API reference](https://elevenlabs.io/docs/api-reference/speech-to-text/v-1-speech-to-text-realtime), [commit strategy guide](https://elevenlabs.io/docs/eleven-api/guides/how-to/speech-to-text/realtime/transcripts-and-commit-strategies), [keyterm guide](https://elevenlabs.io/docs/eleven-api/guides/how-to/speech-to-text/batch/keyterm-prompting), and [entity-detection guide](https://elevenlabs.io/docs/eleven-api/guides/how-to/speech-to-text/batch/entity-detection).
+
+## Install for development
+
+Gabbee needs Python 3.11+, PyQt 6, PipeWire, IBus introspection, and Wayland clipboard tools. `dotool` is the final text/pointer fallback; `qdbus6` enables KWin integration on Plasma.
+
+On Gentoo:
 
 ```bash
-export GABBEE_STT_PROVIDER=whisper_local
+sudo emerge -av app-i18n/ibus gui-apps/wl-clipboard
 ```
 
-Optional tuning keys:
-
-- `GABBEE_TOGGLE_SHORTCUT` (default: `F5`)
-- `GABBEE_WHISPER_LOCAL_MODEL` (default: `tiny`)
-- `GABBEE_WHISPER_LOCAL_DEVICE` (default: `cpu`)
-- `GABBEE_WHISPER_LOCAL_COMPUTE_TYPE` (default: `default`)
-
-## Architecture
-
-Gabbee is split into three layers:
-
-1. `gabbee-bar`
-   A floating controller UI for recording and status.
-2. `gabbee-engine`
-   An IBus engine process that owns focused text commit.
-3. `gabbee.stt`
-   Provider adapters for transcription.
-
-The bar records audio, asks the configured STT backend for text, and then tries to deliver the transcript in a practical order: active-window typing first, IBus when it is the better path, and clipboard mirroring as a safety net.
-
-## Local install
-
-### 1. Install system packages
-
-On Arch or Manjaro, install the runtime pieces first:
+On Arch/Manjaro:
 
 ```bash
-sudo pacman -S --needed python python-pip ibus pipewire wl-clipboard gobject-introspection
+sudo pacman -S --needed python python-pip python-pyqt6 python-dotenv python-requests \
+  python-websockets python-secretstorage ibus pipewire wl-clipboard \
+  gobject-introspection qt6-tools dotool libcanberra
 ```
 
-Notes:
-
-- The IBus engine needs `gi`, so use the system Python at `/usr/bin/python3`.
-- `pw-record` comes from PipeWire.
-- `wl-clipboard` is used for the clipboard fallback on Wayland.
-
-On Ubuntu or Debian-based systems, the equivalent packages are:
+Then install and set up the IBus component:
 
 ```bash
-sudo apt update
-sudo apt install -y python3-venv python3-gi gir1.2-ibus-1.0 ibus pipewire-bin wl-clipboard
-```
-
-### 2. Create a virtual environment and install Gabbee
-
-For a development install from this tree:
-
-```bash
-cd /home/cabewse/gabbee
+cd /path/to/gabbee
 /usr/bin/python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
 python -m pip install -e .
-```
-
-If you want local Whisper instead of ElevenLabs:
-
-```bash
-python -m pip install -e .[whisper_local]
-```
-
-### 3. Create or update the environment file
-
-Gabbee reads `~/.opencasenv/.env` by default.
-
-For ElevenLabs:
-
-```bash
-mkdir -p ~/.opencasenv
-cat > ~/.opencasenv/.env <<'EOF'
-ELEVENLABS_API_KEY=your-key-here
-GABBEE_STT_PROVIDER=elevenlabs
-GABBEE_LANGUAGE_CODE=en
-EOF
-```
-
-For local Whisper:
-
-```bash
-mkdir -p ~/.opencasenv
-cat > ~/.opencasenv/.env <<'EOF'
-GABBEE_STT_PROVIDER=whisper_local
-GABBEE_LANGUAGE_CODE=en
-GABBEE_WHISPER_LOCAL_MODEL=tiny
-GABBEE_WHISPER_LOCAL_DEVICE=cpu
-GABBEE_WHISPER_LOCAL_COMPUTE_TYPE=default
-EOF
-```
-
-### 4. Install the IBus component and launcher
-
-Run the one-shot setup command:
-
-```bash
-source /home/cabewse/gabbee/.venv/bin/activate
-gabbee-install-ibus --setup --icon /home/cabewse/gabbee/gabbee.png
-```
-
-`--setup` writes the IBus component, installs the icon, writes the launcher, and attempts an IBus restart.  
-It also auto-detects the icon from `GABBEE_ICON_PATH` and common project locations, so this repo icon path is the recommended default here.
-
-### 5. Enable the input method in IBus
-
-Open IBus preferences:
-
-```bash
-ibus-setup
-```
-
-Then:
-
-1. Open the `Input Method` tab.
-2. Click `Add`.
-3. Search for `Gabbee`.
-4. Add `Gabbee Voice Input`.
-5. Make sure that input method is selected when you want direct text commit into focused fields.
-6. If the bar says it copied to the clipboard instead of typing, Gabbee is not the active IBus engine for that field.
-
-### 6. Run Gabbee
-
-Start the floating bar:
-
-```bash
-source /home/cabewse/gabbee/.venv/bin/activate
+gabbee-install-ibus --setup --icon "$PWD/gabbee.png"
 gabbee-bar
 ```
 
-Usage:
-
-1. Focus a text field.
-2. If you want explicit IBus commit behavior, switch your current input method to `Gabbee Voice Input`.
-3. Click `Start`.
-4. Speak.
-5. Click `Stop`.
-6. Gabbee will transcribe and try to type into the active window, use IBus when available, and mirror successful output to the clipboard.
-
-On KDE Plasma Wayland, the first run may show a desktop portal prompt to approve the global `F5` push-to-talk shortcut. If you do not approve it, `F5` still works while the Gabbee window is focused.
-
-### 7. Useful checks
-
-Write the component file without starting the engine:
+On LXQt with Labwc, install compositor-native press/release shortcuts and an autostart entry after the commands above:
 
 ```bash
-source /home/cabewse/gabbee/.venv/bin/activate
-python -m gabbee.main_engine --write-component
+gabbee-install-labwc
 ```
 
-If you only want to install the engine component first (for debugging), run:
+This adds idempotent `F5` dictation and `F6` command bindings to `~/.config/labwc/rc.xml`, saves the original as `rc.xml.pre-gabbee`, installs Gabbee and IBus LXQt autostart entries, and reloads Labwc. The bindings call the running bar through `gabbee-control`; they do not require KDE or the GlobalShortcuts portal. `QT_IM_MODULE=ibus`, `GTK_IM_MODULE=ibus`, and `XMODIFIERS=@im=ibus` should be set in the session environment before launching target applications.
+
+The first-run wizard configures the provider credential, microphone, two shortcuts, output test, and IBus/AT-SPI/compositor status. New API keys go to Secret Service or the desktop keyring when available. Existing `.env` credentials continue to work and are not deleted automatically.
+
+## Configuration
+
+The legacy environment file defaults to `~/.opencasenv/.env`; override it with `GABBEE_ENV_FILE`.
+
+Important keys:
+
+- `ELEVENLABS_API_KEY`
+- `GABBEE_STT_PROVIDER` (`elevenlabs`, `gemini`, `whisper_local`, or `mock`)
+- `GABBEE_LANGUAGE_CODE` (default `en`)
+- `GABBEE_ELEVENLABS_MODEL_ID` (default `scribe_v2`)
+- `GABBEE_ELEVENLABS_REALTIME_MODEL_ID` (default `scribe_v2_realtime`)
+- `GABBEE_ELEVENLABS_REALTIME_ENABLED` (default `true`)
+- `GABBEE_ELEVENLABS_KEYTERMS_ENABLED` (default `false`)
+- `GABBEE_ELEVENLABS_ENTITY_DETECTION` (comma-separated friendly hints)
+- `GABBEE_ELEVENLABS_BASE_URL`
+- `GABBEE_AUDIO_SOURCE`
+- `GABBEE_SAMPLE_RATE` (the realtime path is mono 16 kHz)
+- `GABBEE_TOGGLE_SHORTCUT` (default `F5`)
+- `GABBEE_COMMAND_SHORTCUT` (default `F6`)
+- `GABBEE_WHISPER_LOCAL_MODEL`, `GABBEE_WHISPER_LOCAL_DEVICE`, and related local-Whisper settings
+
+Advanced vocabulary, commands, macros, reusable templates, behavior, and profiles live in the XDG config directory as schema-v3 JSON and are managed through Command Studio.
+
+## Architecture
+
+- `gabbee.controller`: capture, realtime/batch recovery, semantic processing, queueing, exactly-once delivery, and Last Dictation state.
+- `gabbee.stt`: batch and streaming provider contracts.
+- `gabbee.number_normalizer` / `gabbee.text_processor`: semantic parsing and layout.
+- `gabbee.output`: focus-aware text delivery router.
+- `gabbee.desktop` / `gabbee.desktop_actions`: replaceable window, accessibility, and pointer backends.
+- `gabbee.macro_runtime` / `gabbee.command_patterns`: typed patterns and cancellable desktop-only actions.
+- `gabbee.ui`: floating bar, numbered overlay, first-run wizard, settings, diagnostics, and Command Studio.
+- `gabbee.ibus_engine`: focused commit and preedit bridge.
+
+KWin integration follows the [KWin scripting API](https://develop.kde.org/docs/plasma/kwin/api/). Accessible target names, actions, and screen extents come from [AT-SPI](https://gnome.pages.gitlab.gnome.org/at-spi2-core/devel-docs/).
+
+## Verification
+
+Run:
 
 ```bash
-gabbee-install-ibus
+PYTHONPATH=src pytest -q
+python -m py_compile $(rg --files src tests -g '*.py')
 ```
 
-To install the launcher and icon only (skip re-writing component):
+Packaged integration should additionally require the IBus namespace and manually qualify terminals, editors, Firefox, Chromium/Electron, and representative chat fields on Plasma or LXQt/Labwc Wayland.
 
-```bash
-gabbee-install-ibus --skip-engine-install --all --icon /home/cabewse/gabbee/gabbee.png
-```
-
-## Why IBus
-
-The point of the IBus boundary is to make voice input behave like text input, not like a keyboard macro recorder. That is the path that avoids repeat-key bugs, device grabs, and compositor-dependent hacks.
-
-## Next steps
-
-- Add persistent settings UI.
-- Add preedit and streaming partial transcript support.
-- Add a guided first-run setup flow for IBus and desktop integration.
-
-## Release checklist
-
-- Run `python -m unittest discover -s tests` inside the project venv.
-- Launch `gabbee-bar` and verify recording, transcription, and delivery still work on the target desktop.
-- Confirm `gabbee-install-ibus --setup` still installs the component, launcher, and icon cleanly.
-- Verify no local `.env`, API keys, or machine-specific secrets are staged.
-- Refresh `docs/gabbee-bar.png` if the bar layout or visual style changed.
-- Re-read the install section and environment keys in this README after any setup or config changes.
+Diagnostics record categories and timings, not audio or transcript contents. Exported reports redact credential-like values.
 
 ## License
 
-Gabbee is licensed under the GNU General Public License v3.0. See `LICENSE`.
+Gabbee is licensed under GPL-3.0. See [LICENSE](LICENSE).

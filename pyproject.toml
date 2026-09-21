@@ -5,14 +5,26 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gabbee"
 version = "0.1.0"
-description = "IME-first English voice input for KDE Plasma Wayland"
+description = "IME-first English voice input for Linux Wayland desktops"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "PyQt6>=6.6",
   "python-dotenv>=1.0",
   "requests>=2.31",
+  "websockets>=14.0",
+  "SecretStorage>=3.3; sys_platform == 'linux'",
+  # gabbee.ui.global_shortcuts imports dbus at module scope, and main_bar
+  # imports that module, so a clean install fails at import without it.
+  "dbus-python>=1.3; sys_platform == 'linux'",
 ]
+
+# PyGObject is deliberately absent. gabbee.ibus_engine, gabbee.main_engine and
+# gabbee.desktop import `gi` for the IBus, GLib and AT-SPI typelibs, which come
+# from the distribution, not from a wheel: listing it here would make pip build
+# pygobject inside a virtualenv against headers it cannot see. Create the
+# environment with `python -m venv --system-site-packages`, or install the
+# distribution package (Gentoo: dev-python/pygobject).
 
 [project.optional-dependencies]
 whisper_local = [
@@ -24,6 +36,9 @@ gabbee-bar = "gabbee.main_bar:main"
 gabbee-engine = "gabbee.main_engine:main"
 gabbee-commit = "gabbee.ibus_client:main"
 gabbee-install-ibus = "gabbee.install:main"
+gabbee-dbus = "gabbee.plasma_dbus_service:main"
+gabbee-control = "gabbee.control:main"
+gabbee-install-labwc = "gabbee.labwc_install:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

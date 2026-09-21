@@ -1,0 +1,7 @@
+[D-BUS Service]
+# The QindaQt desktop activates its voice provider on demand: the panel applet
+# asks for this name the first time it is composed, which is what lets voice
+# work in a fresh session without an autostart race. The bar is the provider,
+# so starting it is starting the service.
+Name=org.qindaqt.Voice1
+Exec=/usr/bin/gabbee-bar

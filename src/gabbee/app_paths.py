@@ -36,6 +36,22 @@ class AppPaths:
         return self.runtime_dir / "engine.sock"
 
     @property
+    def vocabulary_file(self) -> Path:
+        return self.config_dir / "vocabulary.csv"
+
+    @property
+    def advanced_config_file(self) -> Path:
+        return self.config_dir / "advanced.json"
+
+    @property
+    def setup_marker(self) -> Path:
+        return self.config_dir / "setup-complete"
+
+    @property
+    def diagnostics_log(self) -> Path:
+        return self.state_dir / "diagnostics.jsonl"
+
+    @property
     def ibus_component_path(self) -> Path:
         data_home = _xdg_dir("XDG_DATA_HOME", Path.home() / ".local" / "share")
         return data_home / "ibus" / "component" / "gabbee.xml"

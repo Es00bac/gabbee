@@ -26,6 +26,12 @@ class IBusBridgeClient:
     def ping(self) -> CommitReply:
         return self._send({"action": "ping"})
 
+    def update_preedit(self, text: str) -> CommitReply:
+        return self._send({"action": "update_preedit", "text": text})
+
+    def clear_preedit(self) -> CommitReply:
+        return self._send({"action": "clear_preedit"})
+
     def _send(self, payload: dict[str, str]) -> CommitReply:
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
