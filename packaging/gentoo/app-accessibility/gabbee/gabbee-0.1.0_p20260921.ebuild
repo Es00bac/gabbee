@@ -26,8 +26,9 @@ EGIT_COMMIT="6a64da06962cd916366088af43af783ff93d7496"
 LICENSE="GPL-3+"
 SLOT="0"
 KEYWORDS="~amd64"
-IUSE="+qindaqt +ibus sound test"
-RESTRICT="!test? ( test )"
+# AGENT-NOTE: distutils_enable_tests adds IUSE=test, the pytest BDEPEND and
+# the RESTRICT guard, so none of those are repeated here.
+IUSE="+qindaqt +ibus sound"
 
 # The bar is a Qt application that owns two D-Bus names, streams over a
 # WebSocket, reads credentials from the Secret Service, and speaks to IBus and
@@ -52,12 +53,9 @@ RDEPEND="
 	ibus? ( app-i18n/ibus[introspection] )
 	sound? ( media-libs/libcanberra )
 "
-BDEPEND="
-	test? (
-		${RDEPEND}
-		dev-python/pytest[${PYTHON_USEDEP}]
-	)
-"
+# The suite imports the whole package, so it needs the runtime set, not just
+# a test runner.
+BDEPEND="test? ( ${RDEPEND} )"
 
 # A desktop that consumes org.qindaqt.Voice1 wants this package's activation
 # file; this dependency is the other direction, and deliberately absent. The
